@@ -1,29 +1,38 @@
+use std::sync::{Arc, Mutex};
 use crate::Error::NotFound;
 use rocket::http::Status;
 use rocket::local::asynchronous::Client;
-use rocket::Error as RocketError;
+use rocket::{Error as RocketError, State};
 
 #[macro_use]
 extern crate rocket;
 
+
+
+
+
+
+
+
 #[get("/")]
-async fn hello() -> &'static str {
+async fn hello(server: &State<Arc<Mutex<ServerState>>>) -> &'static str {
+    let mut server = server.lock().unwrap(); // Accès exclusif à l'état du serveur
     server.clocked_in = true;
     "Hello, world!"
 }
 
 #[launch]
-fn rocket() -> _ {
-    rocket::build().mount("/", routes![hello])
+fn rocket(serverState: Arc<Mutex<ServerState>>) -> _ {
+    rocket::build().manage(server).mount("/", routes![hello])
 }
 
 #[derive(Default)]
-struct Server {
+struct ServerState {
     clocked_in: bool,
 }
 
-async fn start_server() -> Result<Client, RocketError> {
-    let server = rocket();
+async fn start_server(server_state: Arc<Mutex<ServerState>>) -> Result<Client, RocketError> {
+    let server = rocket(server_state);
 
     let client = Client::tracked(server).await;
     client
@@ -35,10 +44,10 @@ enum Error {
 }
 
 async fn clock_in(client: Client) -> Result<(), Error> {
-    // let response = client.get("/clock-in").dispatch().await;
-    // if response.status() == Status::Ok {
-    //     return Ok(());
-    // }
+    let response = client.get("/").dispatch().await;
+    if response.status() == Status::Ok {
+        return Ok(());
+    }
 
     return Ok(());
     // Err(NotFound)
@@ -46,18 +55,18 @@ async fn clock_in(client: Client) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{clock_in, start_server, Server};
+    use std::sync::{Arc, Mutex};
+    use crate::{clock_in, start_server, ServerState};
 
     #[tokio::test]
     async fn should_client_can_clock_in_server() {
-        let mut server = Server::default();
-
-        // let client = start_server(server).await.unwrap();
+        let server = Arc::new(Mutex::new(ServerState::default())); // État partagé entre les requêtes
+        let client = start_server(server.clone()).await.unwrap();
 
         // assert_eq!(server.clocked_in, false);
 
         // apres avoir clock in
-        assert_eq!(server.clocked_in, true);
+        assert_eq!(server.lock().unwrap().clocked_in, true);
 
         // clock_in(client).await.unwrap();
     }
