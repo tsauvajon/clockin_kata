@@ -1,18 +1,25 @@
-use rocket::Error as RocketError;
-use rocket::http::Status;
-use rocket::local::asynchronous::{Client};
 use crate::Error::NotFound;
+use rocket::http::Status;
+use rocket::local::asynchronous::Client;
+use rocket::Error as RocketError;
 
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
 #[get("/")]
 async fn hello() -> &'static str {
+    server.clocked_in = true;
     "Hello, world!"
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build().mount("/", routes![hello])
+}
+
+#[derive(Default)]
+struct Server {
+    clocked_in: bool,
 }
 
 async fn start_server() -> Result<Client, RocketError> {
@@ -35,23 +42,26 @@ async fn clock_in(client: Client) -> Result<(), Error> {
 
     return Ok(());
     // Err(NotFound)
-
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{clock_in, start_server};
-
+    use crate::{clock_in, start_server, Server};
 
     #[tokio::test]
     async fn should_client_can_clock_in_server() {
-        let client = start_server().await.unwrap();
+        let mut server = Server::default();
 
-        clock_in(client).await.unwrap();
+        // let client = start_server(server).await.unwrap();
+
+        // assert_eq!(server.clocked_in, false);
+
+        // apres avoir clock in
+        assert_eq!(server.clocked_in, true);
+
+        // clock_in(client).await.unwrap();
     }
 
     #[tokio::test]
-    async fn should_not_clock_in_server_when_not_present() {
-
-    }
+    async fn should_not_clock_in_server_when_not_present() {}
 }
